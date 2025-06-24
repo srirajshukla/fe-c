@@ -45,7 +45,10 @@ fn lower_statement(statement: &Statement) -> Vec<Instruction> {
                     }
                 };
 
-                let mv = Instruction::Mov(Operand::Imm(*val), Operand::Register);
+                let mv = Instruction::Mov(
+                    Operand::Imm(*val),
+                    Operand::Reg(crate::assembly::Register::EAX),
+                );
                 instructions.push(mv);
                 instructions.push(Instruction::Ret);
             }

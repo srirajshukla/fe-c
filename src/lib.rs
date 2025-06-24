@@ -17,6 +17,7 @@ pub fn compile(source_code: String) -> Result<String, CompilerError> {
     let ast = parser.parse().map_err(CompilerError::Parser)?;
 
     let assembly_ast = ir_gen::generate_ir(&ast);
+    println!("IR ast: \n {:#?}", &assembly_ast);
 
     let assembly_code = Codegen::generate_asm_string(&assembly_ast);
 

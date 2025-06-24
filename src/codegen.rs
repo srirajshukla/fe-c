@@ -1,4 +1,4 @@
-use crate::assembly::{AssemblyAst, FunctionAst, Instruction};
+use crate::assembly::{AssemblyAst, FunctionAst, Instruction, Operand, Register};
 
 pub struct Codegen;
 
@@ -37,6 +37,29 @@ impl Codegen {
     }
 
     fn map_instruction(inst: &Instruction) -> String {
-        inst.to_string()
+        match inst {
+            Instruction::Ret => "ret".to_string(),
+            Instruction::Mov(src, dest) => {
+                format!(
+                    "movl {}, {}",
+                    Codegen::map_operand(src),
+                    Codegen::map_operand(dest)
+                )
+            }
+        }
+    }
+
+    fn map_operand(op: &Operand) -> String {
+        match op {
+            Operand::Reg(reg) => Codegen::map_register(reg).into(),
+            Operand::Imm(val) => format!("${}", val),
+        }
+    }
+
+    fn map_register(reg: &Register) -> &'static str {
+        match reg {
+            Register::EAX => "%eax",
+            Register::ECX => "%ecx",
+        }
     }
 }

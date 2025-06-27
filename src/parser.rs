@@ -37,6 +37,13 @@ pub enum Statement {
 pub enum Expression {
     LITERAL(i64, Span),
     IDENTIFIER(String, Span),
+    UNARY(UnaryOperator, Box<Expression>),
+}
+
+#[derive(Debug)]
+pub enum UnaryOperator {
+    Complement,
+    Negate,
 }
 
 #[derive(Debug)]
@@ -137,8 +144,8 @@ impl Parser {
         let mut stmts = Vec::new();
 
         while !self.check(TokenType::RBRACE) && !self.is_at_end() {
-                    let stmt = self.parse_statement()?;
-                    stmts.push(stmt);
+            let stmt = self.parse_statement()?;
+            stmts.push(stmt);
         }
 
         let end_token = self.consume_token(TokenType::RBRACE, "Expected '}' at end of block")?;
@@ -167,27 +174,67 @@ impl Parser {
             Some(self.parse_expression()?)
         };
 
-        let end_token = self.consume_token(TokenType::SEMICOLON, "Expected ';' after return statement")?;
+        let end_token =
+            self.consume_token(TokenType::SEMICOLON, "Expected ';' after return statement")?;
         let end_pos = end_token.span.end;
 
         return Ok(Statement::RETURN(expr, start_pos..end_pos));
     }
 
     fn parse_expression(&mut self) -> Result<Expression, ParserError> {
+        match self.peek().ttype {
+            TokenType::BITWISE | TokenType::NEGATION => self.parse_unary_expression(),
+            TokenType::LPAREN => {
+                self.advance();
+                let expr = self.parse_expression()?;
+                self.consume_token(TokenType::RPAREN, "Expected ')' after expression")?;
+                return Ok(expr);
+            }
+            _ => self.parse_primary(),
+        }
+    }
+
+    fn parse_unary_expression(&mut self) -> Result<Expression, ParserError> {
+        match self.peek().ttype {
+            TokenType::BITWISE => {
+                self.advance();
+                let primary_value = self.parse_expression()?;
+                let primary_value = Box::new(primary_value);
+                return Ok(Expression::UNARY(UnaryOperator::Complement, primary_value));
+            }
+            TokenType::NEGATION => {
+                self.advance();
+                let primary_value = self.parse_expression()?;
+                let primary_value = Box::new(primary_value);
+                return Ok(Expression::UNARY(UnaryOperator::Negate, primary_value));
+            }
+            _ => {
+                return Err(ParserError::UnexpectedToken {
+                    expected: "Expected a unary operator".to_string(),
+                    found: self.peek().clone(),
+                });
+            }
+        }
+    }
+
+    fn parse_primary(&mut self) -> Result<Expression, ParserError> {
         match &self.peek().ttype {
             TokenType::NUMBER => {
                 let token = self.advance().clone();
-                let value = token.lexeme.parse::<i64>()
-                .map_err(|_| ParserError::InvalidNumber(token.lexeme.clone()))?;
+                let value = token
+                    .lexeme
+                    .parse::<i64>()
+                    .map_err(|_| ParserError::InvalidNumber(token.lexeme.clone()))?;
                 Ok(Expression::LITERAL(value, token.span))
-            },
+            }
             TokenType::IDENTIFIER => {
                 let token = self.advance().clone();
                 Ok(Expression::IDENTIFIER(token.lexeme.clone(), token.span))
-            },
-            _ => {
-                Err(ParserError::UnexpectedToken { expected: "Expecting an expression".to_string(), found: self.peek().clone() })
             }
+            _ => Err(ParserError::UnexpectedToken {
+                expected: "Expecting an expression".to_string(),
+                found: self.peek().clone(),
+            }),
         }
     }
 
@@ -210,9 +257,14 @@ impl Parser {
         if let TokenType::IDENTIFIER = self.peek().ttype {
             Ok(self.advance().lexeme.clone())
         } else if self.is_at_end() {
-            Err(ParserError::UnexpectedEof { expected: msg.to_string() })
+            Err(ParserError::UnexpectedEof {
+                expected: msg.to_string(),
+            })
         } else {
-            Err(ParserError::UnexpectedToken { expected: msg.to_string(), found: self.peek().clone() })
+            Err(ParserError::UnexpectedToken {
+                expected: msg.to_string(),
+                found: self.peek().clone(),
+            })
         }
     }
 
@@ -258,7 +310,7 @@ impl Parser {
         if self.is_at_end() {
             return false;
         } else {
-            return self.peek().ttype == expected
+            return self.peek().ttype == expected;
         }
     }
 

@@ -43,6 +43,9 @@ fn lower_statement(statement: &Statement) -> Vec<Instruction> {
                     Expression::IDENTIFIER(identifier, _) => {
                         todo!("identifier : {} expression not implemented yet", identifier)
                     }
+                    Expression::UNARY(op, _exp) => {
+                        todo!("unary operator: {:#?} not implemented", &op);
+                    }
                 };
 
                 let mv = Instruction::Mov(

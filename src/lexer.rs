@@ -1,5 +1,8 @@
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TokenType {
+    BITWISE,
+    NEGATION,
+    DECREMENT,
     LPAREN,
     RPAREN,
     LBRACE,
@@ -142,14 +145,14 @@ impl Lexer {
                 }
             }
         }
-            return Ok(());
+        return Ok(());
     }
 
     fn parse_number(&mut self) -> Result<Token, String> {
         println!("parsing a number now");
         let start_pos = self.pos;
         let mut numbers = String::new();
-        
+
         while let Some(ch) = self.current_char {
             if ch.is_ascii_digit() {
                 numbers.push(ch);
@@ -158,16 +161,24 @@ impl Lexer {
                 // only if this is a breaking character, the number is valid
                 // if it a character for example, this number is probably invalid
                 if ch.is_alphabetic() {
-                    return Err(format!("A number cannot end with alphabets. Ends with {} at {}", ch, self.pos));
+                    return Err(format!(
+                        "A number cannot end with alphabets. Ends with {} at {}",
+                        ch, self.pos
+                    ));
                 }
                 break;
             }
         }
 
-        if numbers.is_empty() { 
+        if numbers.is_empty() {
             return Err("Not a valid number".to_string());
         }
-        return Ok(Token::new(TokenType::NUMBER, start_pos, self.pos, numbers.to_string()));
+        return Ok(Token::new(
+            TokenType::NUMBER,
+            start_pos,
+            self.pos,
+            numbers.to_string(),
+        ));
     }
 
     fn parse_keyword_or_ident(&mut self) -> Result<Token, String> {
@@ -179,7 +190,10 @@ impl Lexer {
                 word.push(ch);
                 self.advance();
             } else {
-                return Err(format!("Identifier should start with alphabet or _, starts with {}", ch));
+                return Err(format!(
+                    "Identifier should start with alphabet or _, starts with {}",
+                    ch
+                ));
             }
         }
 
@@ -194,7 +208,12 @@ impl Lexer {
 
         if Keyword::is_keyword(&word) {
             let kw = Keyword::to_keyword(&word).unwrap();
-            return Ok(Token::new(TokenType::KEYWORD(kw), start_pos, self.pos, word));
+            return Ok(Token::new(
+                TokenType::KEYWORD(kw),
+                start_pos,
+                self.pos,
+                word,
+            ));
         } else {
             return Ok(Token::new(TokenType::IDENTIFIER, start_pos, self.pos, word));
         }
@@ -208,6 +227,25 @@ impl Lexer {
             println!("Lexing at position: {}", i);
             match self.current_char {
                 None => return Ok(Token::new(TokenType::EOF, i, i, String::new())),
+                Some('~') => {
+                    self.advance();
+                    return Ok(Token::new(TokenType::BITWISE, i, i + 1, "~".to_string()));
+                }
+                Some('-') => {
+                    self.advance();
+                    if let Some(x) = self.current_char {
+                        if x == '-' {
+                            self.advance();
+                            return Ok(Token::new(
+                                TokenType::DECREMENT,
+                                i,
+                                i + 2,
+                                "--".to_string(),
+                            ));
+                        }
+                    }
+                    return Ok(Token::new(TokenType::NEGATION, i, i + 1, "-".to_string()));
+                }
                 Some('(') => {
                     self.advance();
                     return Ok(Token::new(TokenType::LPAREN, i, i + 1, "(".to_string()));
@@ -239,7 +277,6 @@ impl Lexer {
                         self.advance();
                         self.skip_comment()?;
                     }
-
                 }
                 Some(ch) if ch.is_ascii_digit() => {
                     return self.parse_number();
@@ -247,7 +284,12 @@ impl Lexer {
                 Some(ch) if ch.is_alphabetic() || ch == '_' => {
                     return self.parse_keyword_or_ident();
                 }
-                ch => return Err(format!("Unimplemented character: {:#?} at position: {}", &ch, i)),
+                ch => {
+                    return Err(format!(
+                        "Unimplemented character: {:#?} at position: {}",
+                        &ch, i
+                    ));
+                }
             }
         }
     }
@@ -269,4 +311,3 @@ impl Lexer {
         return Ok(tokens);
     }
 }
-

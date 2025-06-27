@@ -1,29 +1,34 @@
 use std::fs;
 use std::process::Command;
 
-use fe_c::compile;
+use fe_c::{CompilationStage, compile};
 
+#[derive(Debug)]
 struct InputOptions {
     file_name: String,
-    lex_only: bool,
+    stage: CompilationStage,
 }
 
 impl InputOptions {
     fn from_opts(opts: &[String]) -> Self {
         let mut v = Self {
             file_name: String::new(),
-            lex_only: false,
+            stage: CompilationStage::Run,
         };
 
         for opt in opts {
-            if opt.contains("--lex") {
-                v.lex_only = true;
-            } else {
-                v.file_name = opt.clone();
+            match opt.as_str() {
+                "--lex" => v.stage = CompilationStage::Lex,
+                "--parse" => v.stage = CompilationStage::Parse,
+                "--validate" => v.stage = CompilationStage::Validate,
+                "--tacky" => v.stage = CompilationStage::Tacky,
+                "--codegen" => v.stage = CompilationStage::Codegen,
+                "--run" => v.stage = CompilationStage::Run,
+                _ => v.file_name = opt.to_string(),
             }
         }
 
-        return v;
+        v
     }
 
     fn read_contents(&self) -> String {
@@ -77,11 +82,21 @@ fn main() {
     let opts = InputOptions::from_opts(&args[1..]);
 
     let program = opts.read_contents();
-    match compile(program) {
-        Ok(assembly_code) => {
-            let asm_file_name = write_to_file(&opts.file_name, &assembly_code).unwrap();
-            generate_exe(&asm_file_name);
-        }
+
+    match compile(program, &opts.stage) {
+        Ok(result) => match opts.stage {
+            CompilationStage::Lex
+            | CompilationStage::Parse
+            | CompilationStage::Validate
+            | CompilationStage::Tacky
+            | CompilationStage::Codegen => {
+                println!("{:#?}", result);
+            }
+            CompilationStage::Run => {
+                let asm_file_name = write_to_file(&opts.file_name, &result).unwrap();
+                generate_exe(&asm_file_name);
+            }
+        },
         Err(err) => {
             eprintln!("Compilation Failed: {:#?}", &err);
             std::process::exit(1);

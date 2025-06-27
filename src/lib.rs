@@ -3,10 +3,13 @@ pub mod codegen;
 pub mod ir_gen;
 pub mod lexer;
 pub mod parser;
+mod tacky_gen;
+mod tacky_ir;
 
 use crate::codegen::Codegen;
 use crate::lexer::Lexer;
 use crate::parser::{Parser, ParserError};
+use crate::tacky_gen::{TackyError, TackyIrGenerator};
 
 #[derive(Debug)]
 pub enum CompilationStage {
@@ -34,6 +37,15 @@ pub fn compile(source_code: String, stage: &CompilationStage) -> Result<String, 
         return Ok("parse finished".to_string());
     }
 
+    let mut tacky = TackyIrGenerator::new();
+    let tacky_ast = tacky.generate_program(&ast).map_err(CompilerError::Tacky)?;
+
+    println!("Tacky AST:\n{:#?}", &tacky_ast);
+
+    if matches!(stage, CompilationStage::Tacky) {
+        return Ok("tacky finished".to_string());
+    }
+
     let assembly_ast = ir_gen::generate_ir(&ast);
     println!("IR ast: \n {:#?}", &assembly_ast);
 
@@ -49,4 +61,5 @@ pub fn compile(source_code: String, stage: &CompilationStage) -> Result<String, 
 pub enum CompilerError {
     Lexer(String),
     Parser(ParserError),
+    Tacky(TackyError),
 }

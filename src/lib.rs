@@ -41,6 +41,8 @@ pub fn compile(source_code: String, stage: &CompilationStage) -> Result<String, 
     let tacky_ast = tacky.generate_program(&ast).map_err(CompilerError::Tacky)?;
 
     println!("Tacky AST:\n{:#?}", &tacky_ast);
+    println!("Tacky AST:\n{}", &tacky_ast);
+    println!("Tacky IR:\n{}", &tacky_ast.pretty_print_with_comments());
 
     if matches!(stage, CompilationStage::Tacky) {
         return Ok("tacky finished".to_string());

@@ -84,8 +84,7 @@ pub fn fix_mov_stack_allocation(instruction: &Vec<AsmInstruction>) -> Vec<AsmIns
     let mut new_instructions = Vec::new();
     for inst in instruction {
         if let AsmInstruction::Mov(src, dest) = inst {
-            if std::mem::discriminant(src) == std::mem::discriminant(dest)
-                && std::mem::discriminant(src) == std::mem::discriminant(&AsmOperand::Stack(0))
+            if let (AsmOperand::Stack(_), AsmOperand::Stack(_)) = (src, dest)
             {
                 new_instructions.push(AsmInstruction::Mov(
                     src.clone(),

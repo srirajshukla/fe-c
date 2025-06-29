@@ -39,7 +39,7 @@ impl Codegen {
     }
 
     fn map_instruction(inst: &AsmInstruction) -> String {
-        match &inst {
+        match inst {
             AsmInstruction::Ret => "ret".to_string(),
             AsmInstruction::Mov(src, dest) => {
                 format!(
@@ -48,17 +48,17 @@ impl Codegen {
                     Codegen::map_operand(dest)
                 )
             }
-            &AsmInstruction::AsmUnary(operator, operand) => {
+            AsmInstruction::AsmUnary(operator, operand) => {
                 format!(
                     "{} {}",
-                    Self::map_unary_operator(operator),
-                    Codegen::map_operand(operand)
+                    Self::map_unary_operator(&operator),
+                    Codegen::map_operand(&operand)
                 )
             }
-            &AsmInstruction::AllocateStack(size) => {
-                format!("subq ${}, %rsp", *size)
+            AsmInstruction::AllocateStack(size) => {
+                format!("subq ${}, %rsp", size)
             },
-            &AsmInstruction::Push(reg) => {
+            AsmInstruction::Push(reg) => {
                 format!("pushq {}", Self::map_register(&reg.clone()))
             }
             AsmInstruction::Pop(reg) => {

@@ -1,4 +1,6 @@
-use crate::assembly::{AssemblyAst, FunctionAst, Instruction, Operand, Register};
+use crate::asm_ir_pass::assembly_ir::{
+    AsmFunction, AsmInstruction, AsmOperand, AsmRegister, AsmUnaryOperator, AssemblyAst,
+};
 
 pub struct Codegen;
 
@@ -12,7 +14,7 @@ impl Codegen {
         return function_out;
     }
 
-    fn map_function(func: &FunctionAst) -> String {
+    fn map_function(func: &AsmFunction) -> String {
         let mut out = String::new();
         out.push_str("\t");
         out.push_str(".globl ");
@@ -36,30 +38,58 @@ impl Codegen {
         return out;
     }
 
-    fn map_instruction(inst: &Instruction) -> String {
-        match inst {
-            Instruction::Ret => "ret".to_string(),
-            Instruction::Mov(src, dest) => {
+    fn map_instruction(inst: &AsmInstruction) -> String {
+        match &inst {
+            AsmInstruction::Ret => "ret".to_string(),
+            AsmInstruction::Mov(src, dest) => {
                 format!(
-                    "movl {}, {}",
+                    "movq {}, {}",
                     Codegen::map_operand(src),
                     Codegen::map_operand(dest)
                 )
             }
+            &AsmInstruction::AsmUnary(operator, operand) => {
+                format!(
+                    "{} {}",
+                    Self::map_unary_operator(operator),
+                    Codegen::map_operand(operand)
+                )
+            }
+            &AsmInstruction::AllocateStack(size) => {
+                format!("subq ${}, %rsp", *size)
+            },
+            &AsmInstruction::Push(reg) => {
+                format!("pushq {}", Self::map_register(&reg.clone()))
+            }
+            AsmInstruction::Pop(reg) => {
+                format!("popq {}", Self::map_register(&reg.clone()))
+            }
         }
     }
 
-    fn map_operand(op: &Operand) -> String {
+    fn map_operand(op: &AsmOperand) -> String {
         match op {
-            Operand::Reg(reg) => Codegen::map_register(reg).into(),
-            Operand::Imm(val) => format!("${}", val),
+            AsmOperand::Reg(reg) => Codegen::map_register(reg).into(),
+            AsmOperand::Imm(val) => format!("${}", val),
+            &AsmOperand::Pseudo(_) => panic!("pseudo shouldn't be part of codegen"),
+            &AsmOperand::Stack(pos) => format!("{}(%rbp)", pos),
         }
     }
 
-    fn map_register(reg: &Register) -> &'static str {
+    fn map_register(reg: &AsmRegister) -> &'static str {
         match reg {
-            Register::EAX => "%eax",
-            Register::ECX => "%ecx",
+            AsmRegister::AX => "%rax",
+            AsmRegister::ECX => "%rcx",
+            AsmRegister::R10 => "%r10",
+            AsmRegister::RBP => "%rbp",
+            AsmRegister::RSP => "%rsp",
+        }
+    }
+
+    fn map_unary_operator(op: &AsmUnaryOperator) -> &'static str {
+        match op {
+            AsmUnaryOperator::Neg => "negq",
+            AsmUnaryOperator::Not => "notq",
         }
     }
 }

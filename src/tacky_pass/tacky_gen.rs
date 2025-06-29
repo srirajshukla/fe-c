@@ -1,4 +1,5 @@
-use crate::{parser, tacky_ir};
+use crate::parser;
+use crate::tacky_pass::tacky_ir;
 
 pub struct TackyIrGenerator {
     var_cnt: usize,

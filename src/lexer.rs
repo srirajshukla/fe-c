@@ -1,5 +1,14 @@
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TokenType {
+    PLUS,
+    ASTERISK,
+    ForwardSlash,
+    PERCENT,
+    AND,
+    OR,
+    XOR,
+    LeftShift,
+    RightShift,
     BITWISE,
     NEGATION,
     DECREMENT,
@@ -107,6 +116,16 @@ impl Lexer {
         }
     }
 
+    fn skip_until_newline(&mut self) -> Result<(), String> {
+        while let Some(ch) = self.current_char {
+            self.advance();
+            if ch == '\n' {
+                break;
+            }
+        }
+        Ok(())
+    }
+
     fn skip_comment(&mut self) -> Result<(), String> {
         let cc = self.current_char;
 
@@ -119,13 +138,7 @@ impl Lexer {
         if cc == '/' {
             // skip characters until new line is found
             self.advance(); // skip /
-
-            while let Some(ch) = self.current_char {
-                self.advance();
-                if ch == '\n' {
-                    break;
-                }
-            }
+            self.skip_until_newline()?;
         } else if cc == '*' {
             self.advance();
 
@@ -227,9 +240,33 @@ impl Lexer {
             println!("Lexing at position: {}", i);
             match self.current_char {
                 None => return Ok(Token::new(TokenType::EOF, i, i, String::new())),
+                Some('+') => {
+                    self.advance();
+                    return Ok(Token::new(TokenType::PLUS, i + 1, i, "+".to_string()));
+                }
+                Some('*') => {
+                    self.advance();
+                    return Ok(Token::new(TokenType::ASTERISK, i + 1, i, "*".to_string()));
+                }
+                Some('%') => {
+                    self.advance();
+                    return Ok(Token::new(TokenType::PERCENT, i + 1, i, "%".to_string()));
+                }
                 Some('~') => {
                     self.advance();
                     return Ok(Token::new(TokenType::BITWISE, i, i + 1, "~".to_string()));
+                }
+                Some('&') => {
+                    self.advance();
+                    return Ok(Token::new(TokenType::AND, i, i + 1, "&".to_string()));
+                }
+                Some('|') => {
+                    self.advance();
+                    return Ok(Token::new(TokenType::OR, i, i + 1, "|".to_string()));
+                }
+                Some('^') => {
+                    self.advance();
+                    return Ok(Token::new(TokenType::XOR, i, i + 1, "^".to_string()));
                 }
                 Some('-') => {
                     self.advance();
@@ -266,6 +303,11 @@ impl Lexer {
                     self.advance();
                     return Ok(Token::new(TokenType::SEMICOLON, i, i + 1, ";".to_string()));
                 }
+                Some('#') => {
+                    // Process # as a comment for now
+                    self.advance();
+                    self.skip_until_newline()?;
+                }
                 Some('/') => {
                     let next = self.peek();
                     if next.is_none() {
@@ -273,11 +315,50 @@ impl Lexer {
                     }
                     let next = next.unwrap();
 
+                    self.advance();
                     if next == '/' || next == '*' {
-                        self.advance();
                         self.skip_comment()?;
+                    } else {
+                        return Ok(Token::new(
+                            TokenType::ForwardSlash,
+                            i,
+                            i + 1,
+                            "/".to_string(),
+                        ));
                     }
                 }
+                Some('>') => {
+                    let next = self.peek();
+                    if next.is_none() {
+                        return Err(format!("Unexpected EOF after > at position {}", i));
+                    }
+                    let next = next.unwrap();
+
+                    if next == '>' {
+                        self.advance();
+                        self.advance();
+                        return Ok(Token::new(
+                            TokenType::RightShift,
+                            i,
+                            i + 2,
+                            ">>".to_string(),
+                        ));
+                    }
+                }
+                Some('<') => {
+                    let next = self.peek();
+                    if next.is_none() {
+                        return Err(format!("Unexpected EOF after < at position {}", i));
+                    }
+                    let next = next.unwrap();
+
+                    if next == '<' {
+                        self.advance();
+                        self.advance();
+                        return Ok(Token::new(TokenType::LeftShift, i, i + 2, "<<".to_string()));
+                    }
+                }
+
                 Some(ch) if ch.is_ascii_digit() => {
                     return self.parse_number();
                 }

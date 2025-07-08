@@ -17,11 +17,11 @@ pub struct Function {
 #[derive(Debug)]
 pub struct Block {
     pub stmt: Vec<Statement>,
-    span: Span,
+    pub span: Span,
 }
 
 #[derive(Debug)]
-struct Parameter {
+pub struct Parameter {
     param_type: Type,
     param_name: String,
     span: Span,
@@ -37,7 +37,56 @@ pub enum Statement {
 pub enum Expression {
     LITERAL(i64, Span),
     IDENTIFIER(String, Span),
+
     UNARY(UnaryOperator, Box<Expression>),
+    Binary(BinaryExp),
+}
+
+impl Expression {
+    pub fn span(&self) -> Span {
+        match self {
+            Self::LITERAL(_, span) => span.clone(),
+            Self::IDENTIFIER(_, span) => span.clone(),
+            Self::UNARY(_, expression) => expression.span(),
+            Self::Binary(binary_exp) => binary_exp.span.clone(),
+        }
+    }
+
+    pub fn binary(left: Expression, operator: BinaryOperator, right: Expression) -> Self {
+        let span = left.span().start..right.span().end;
+        Expression::Binary(BinaryExp {
+            left: Box::new(left),
+            operator: operator,
+            right: Box::new(right),
+            span: span,
+        })
+    }
+
+    pub fn unary(operator: UnaryOperator, expression: Expression) -> Expression {
+        Expression::UNARY(operator, Box::new(expression))
+    }
+}
+
+#[derive(Debug)]
+pub struct BinaryExp {
+    pub left: Box<Expression>,
+    pub operator: BinaryOperator,
+    pub right: Box<Expression>,
+    pub span: Span,
+}
+
+#[derive(Debug)]
+pub enum BinaryOperator {
+    Add,
+    Subtract,
+    Multiply,
+    Divide,
+    Remainder,
+    And,
+    Or,
+    Xor,
+    LeftShift,
+    RightShift,
 }
 
 #[derive(Debug)]
@@ -171,7 +220,7 @@ impl Parser {
         let expr = if self.check(TokenType::SEMICOLON) {
             None
         } else {
-            Some(self.parse_expression()?)
+            Some(self.parse_expression(0)?)
         };
 
         let end_token =
@@ -181,14 +230,63 @@ impl Parser {
         return Ok(Statement::RETURN(expr, start_pos..end_pos));
     }
 
-    fn parse_expression(&mut self) -> Result<Expression, ParserError> {
+    fn parse_expression(&mut self, min_precedence: u8) -> Result<Expression, ParserError> {
+        // parse the initial atom (LHS)
+        let mut lhs = self.parse_atom()?;
+
+        // as long as we find operator with sufficient precedence
+        loop {
+            if self.is_at_end() {
+                break;
+            }
+
+            let operator_token = self.peek();
+
+            let operator = match self.token_to_binary_operator(&operator_token.ttype) {
+                Some(op) => op,
+                None => break,
+            };
+
+            let precedence = self.get_binary_operator_precedence(&operator);
+
+            if precedence < min_precedence {
+                break;
+            }
+
+            self.advance();
+
+            let rhs = self.parse_expression(precedence + 1)?;
+
+            lhs = Expression::binary(lhs, operator, rhs);
+        }
+        Ok(lhs)
+    }
+
+    fn parse_atom(&mut self) -> Result<Expression, ParserError> {
         match self.peek().ttype {
-            TokenType::BITWISE | TokenType::NEGATION => self.parse_unary_expression(),
+            TokenType::BITWISE | TokenType::NEGATION => {
+                let operator_token = self.advance().clone();
+                let operator_start = operator_token.span.start;
+
+                let expr = self.parse_expression(70)?;
+
+                let unary_op = match operator_token.ttype {
+                    TokenType::BITWISE => UnaryOperator::Complement,
+                    TokenType::NEGATION => UnaryOperator::Negate,
+                    _ => unreachable!(),
+                };
+
+                Ok(Expression::unary(unary_op, expr))
+            }
             TokenType::LPAREN => {
-                self.advance();
-                let expr = self.parse_expression()?;
-                self.consume_token(TokenType::RPAREN, "Expected ')' after expression")?;
-                return Ok(expr);
+                self.advance(); // consume '('
+                let expr = self.parse_expression(0)?;
+                self.consume_token(
+                    TokenType::RPAREN,
+                    "Expected ')' after parenthesized expression",
+                )?;
+
+                Ok(expr)
             }
             _ => self.parse_primary(),
         }
@@ -198,13 +296,13 @@ impl Parser {
         match self.peek().ttype {
             TokenType::BITWISE => {
                 self.advance();
-                let primary_value = self.parse_expression()?;
+                let primary_value = self.parse_expression(70)?;
                 let primary_value = Box::new(primary_value);
                 return Ok(Expression::UNARY(UnaryOperator::Complement, primary_value));
             }
             TokenType::NEGATION => {
                 self.advance();
-                let primary_value = self.parse_expression()?;
+                let primary_value = self.parse_expression(70)?;
                 let primary_value = Box::new(primary_value);
                 return Ok(Expression::UNARY(UnaryOperator::Negate, primary_value));
             }
@@ -218,6 +316,12 @@ impl Parser {
     }
 
     fn parse_primary(&mut self) -> Result<Expression, ParserError> {
+        if self.is_at_end() {
+            return Err(ParserError::UnexpectedEof {
+                expected: "an expression".to_string(),
+            });
+        }
+
         match &self.peek().ttype {
             TokenType::NUMBER => {
                 let token = self.advance().clone();
@@ -320,5 +424,34 @@ impl Parser {
             return true;
         }
         return false;
+    }
+}
+
+impl Parser {
+    fn token_to_binary_operator(&self, token_type: &TokenType) -> Option<BinaryOperator> {
+        match token_type {
+            TokenType::PLUS => Some(BinaryOperator::Add),
+            TokenType::NEGATION => Some(BinaryOperator::Subtract), // '-' can be both unary and binary
+            TokenType::ASTERISK => Some(BinaryOperator::Multiply),
+            TokenType::ForwardSlash => Some(BinaryOperator::Divide),
+            TokenType::PERCENT => Some(BinaryOperator::Remainder),
+            TokenType::AND => Some(BinaryOperator::And),
+            TokenType::OR => Some(BinaryOperator::Or),
+            TokenType::XOR => Some(BinaryOperator::Xor),
+            TokenType::LeftShift => Some(BinaryOperator::LeftShift),
+            TokenType::RightShift => Some(BinaryOperator::RightShift),
+            _ => None,
+        }
+    }
+
+    fn get_binary_operator_precedence(&self, op: &BinaryOperator) -> u8 {
+        match op {
+            BinaryOperator::Or => 10,
+            BinaryOperator::Xor => 20,
+            BinaryOperator::And => 30,
+            BinaryOperator::LeftShift | BinaryOperator::RightShift => 40,
+            BinaryOperator::Add | BinaryOperator::Subtract => 50,
+            BinaryOperator::Multiply | BinaryOperator::Divide | BinaryOperator::Remainder => 60,
+        }
     }
 }

@@ -1,5 +1,5 @@
 use crate::asm_ir_pass::assembly_ir::{
-    AsmFunction, AsmInstruction, AsmOperand, AsmRegister, AsmUnaryOperator, AssemblyAst,
+    AsmFunction, AsmInstruction, AsmOperand, AsmRegister, AsmUnaryOperator, AssemblyAst,AsmBinaryOperator,
 };
 
 pub struct Codegen;
@@ -42,28 +42,37 @@ impl Codegen {
         match inst {
             AsmInstruction::Ret => "ret".to_string(),
             AsmInstruction::Mov(src, dest) => {
-                format!(
-                    "movq {}, {}",
-                    Codegen::map_operand(src),
-                    Codegen::map_operand(dest)
-                )
-            }
+                        format!(
+                            "movq {}, {}",
+                            Codegen::map_operand(src),
+                            Codegen::map_operand(dest)
+                        )
+                    }
             AsmInstruction::AsmUnary(operator, operand) => {
-                format!(
-                    "{} {}",
-                    Self::map_unary_operator(&operator),
-                    Codegen::map_operand(&operand)
-                )
-            }
+                        format!(
+                            "{} {}",
+                            Self::map_unary_operator(&operator),
+                            Codegen::map_operand(&operand)
+                        )
+                    }
             AsmInstruction::AllocateStack(size) => {
-                format!("subq ${}, %rsp", size)
-            },
+                        format!("subq ${}, %rsp", size)
+                    },
             AsmInstruction::Push(reg) => {
-                format!("pushq {}", Self::map_register(&reg.clone()))
-            }
+                        format!("pushq {}", Self::map_register(&reg.clone()))
+                    }
             AsmInstruction::Pop(reg) => {
-                format!("popq {}", Self::map_register(&reg.clone()))
+                        format!("popq {}", Self::map_register(&reg.clone()))
+                    }
+            AsmInstruction::Cdq => {
+                format!("cqo")
             }
+            AsmInstruction::Idiv(asm_operand) => {
+                format!("idivq {}", Self::map_operand(asm_operand))
+            }
+            AsmInstruction::AsmBinary(asm_binary_operator, asm_operand1, asm_operand2) => {
+                format!("{} {}, {}", Self::map_binary_operator(&asm_binary_operator), Self::map_operand(&asm_operand1), Self::map_operand(&asm_operand2))
+            },
         }
     }
 
@@ -79,8 +88,11 @@ impl Codegen {
     fn map_register(reg: &AsmRegister) -> &'static str {
         match reg {
             AsmRegister::AX => "%rax",
+            AsmRegister::DX => "%rdx",
             AsmRegister::ECX => "%rcx",
             AsmRegister::R10 => "%r10",
+            AsmRegister::R11 => "%r11",
+            AsmRegister::CL => "%cl",
             AsmRegister::RBP => "%rbp",
             AsmRegister::RSP => "%rsp",
         }
@@ -90,6 +102,19 @@ impl Codegen {
         match op {
             AsmUnaryOperator::Neg => "negq",
             AsmUnaryOperator::Not => "notq",
+        }
+    }
+
+    fn map_binary_operator(op: &AsmBinaryOperator) -> &'static str {
+        match op {
+            AsmBinaryOperator::Add => "addq",
+            AsmBinaryOperator::Sub => "subq",
+            AsmBinaryOperator::Mult => "imulq",
+            AsmBinaryOperator::Xor => "xorq",
+            AsmBinaryOperator::And => "andq",
+            AsmBinaryOperator::Or => "orq",
+            AsmBinaryOperator::Shr => "shrq",
+            AsmBinaryOperator::Shl => "shlq",
         }
     }
 }

@@ -107,6 +107,29 @@ impl TackyIrGenerator {
                 instructions.push(unary);
                 Ok((instructions, result_var))
             }
+            parser::Expression::Binary(parser::BinaryExp{left, operator, right, span: _span}) => {
+                let (mut instructions1, operand1) = self.emit_expression(left)?;
+                let (mut instructions2, operand2) = self.emit_expression(right)?;
+
+                let dst_var = self.make_temporary();
+                let dst_var = tacky_ir::TackyVal::Variable(dst_var);
+
+                let binary = tacky_ir::TackyInstruction::Binary(
+                    tacky_ir::TackyBinary {
+                        operator: Self::convert_binary_operator(operator),
+                        src1: operand1,
+                        src2: operand2,
+                        dest: dst_var.clone(),
+                    }
+                );
+
+                let mut instructions = Vec::new();
+                instructions.append(&mut instructions1);
+                instructions.append(&mut instructions2);
+                instructions.push(binary);
+
+                Ok((instructions, dst_var))
+            }
         }
     }
 
@@ -114,6 +137,21 @@ impl TackyIrGenerator {
         match op {
             parser::UnaryOperator::Complement => tacky_ir::TackyUnaryOperator::Complement,
             parser::UnaryOperator::Negate => tacky_ir::TackyUnaryOperator::Negate,
+        }
+    }
+
+    fn convert_binary_operator(op: &parser::BinaryOperator) -> tacky_ir::TackyBinaryOperator {
+        match op {
+            parser::BinaryOperator::Add => tacky_ir::TackyBinaryOperator::Add,
+            parser::BinaryOperator::Subtract => tacky_ir::TackyBinaryOperator::Subtract,
+            parser::BinaryOperator::Multiply => tacky_ir::TackyBinaryOperator::Multiply,
+            parser::BinaryOperator::Divide => tacky_ir::TackyBinaryOperator::Divide,
+            parser::BinaryOperator::Remainder => tacky_ir::TackyBinaryOperator::Remainder,
+            parser::BinaryOperator::And => tacky_ir::TackyBinaryOperator::And,
+            parser::BinaryOperator::Or => tacky_ir::TackyBinaryOperator::Or,
+            parser::BinaryOperator::Xor => tacky_ir::TackyBinaryOperator::Xor,
+            parser::BinaryOperator::LeftShift => tacky_ir::TackyBinaryOperator::LeftShift,
+            parser::BinaryOperator::RightShift => tacky_ir::TackyBinaryOperator::RightShift,
         }
     }
 }

@@ -15,6 +15,7 @@ pub struct TackyFunction {
 pub enum TackyInstruction {
     Return(Option<TackyVal>),
     Unary(TackyUnary),
+    Binary(TackyBinary),
 }
 
 #[derive(Debug, Clone)]
@@ -34,6 +35,28 @@ pub struct TackyUnary {
 pub enum TackyUnaryOperator {
     Complement,
     Negate,
+}
+
+#[derive(Debug, Clone)]
+pub struct TackyBinary {
+    pub operator: TackyBinaryOperator,
+    pub src1: TackyVal,
+    pub src2: TackyVal,
+    pub dest: TackyVal,
+}
+
+#[derive(Debug, Clone)]
+pub enum TackyBinaryOperator {
+    Add,
+    Subtract,
+    Multiply,
+    Divide,
+    Remainder,
+    And,
+    Or,
+    Xor,
+    LeftShift,
+    RightShift,
 }
 
 impl fmt::Display for TackyProgram {
@@ -61,6 +84,9 @@ impl fmt::Display for TackyInstruction {
             },
             TackyInstruction::Unary(unary) => {
                 write!(f, "{} = {} {}", unary.dest, unary.operator, unary.src)
+            },
+            TackyInstruction::Binary(binary) => {
+                write!(f, "{} = {} {} {}", binary.dest, binary.src1, binary.operator, binary.src2)
             }
         }
     }
@@ -84,6 +110,23 @@ impl fmt::Display for TackyUnaryOperator {
         match self {
             TackyUnaryOperator::Complement => write!(f, "~"),
             TackyUnaryOperator::Negate => write!(f, "-"),
+        }
+    }
+}
+
+impl fmt::Display for TackyBinaryOperator {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            TackyBinaryOperator::Add => write!(f, "+"),
+            TackyBinaryOperator::Subtract => write!(f, "-"),
+            TackyBinaryOperator::Multiply => write!(f, "*"),
+            TackyBinaryOperator::Divide => write!(f, "/"),
+            TackyBinaryOperator::Remainder => write!(f, "%"),
+            TackyBinaryOperator::And => write!(f, "&"),
+            TackyBinaryOperator::Or => write!(f, "|"),
+            TackyBinaryOperator::Xor => write!(f, "^"),
+            TackyBinaryOperator::LeftShift => write!(f, "<<"),
+            TackyBinaryOperator::RightShift => write!(f, ">>"),
         }
     }
 }
@@ -117,6 +160,18 @@ impl TackyInstruction {
                 TackyUnaryOperator::Complement => "Bitwise complement",
                 TackyUnaryOperator::Negate => "Arithmetic negation",
             },
+            TackyInstruction::Binary(binary) => match binary.operator {
+                TackyBinaryOperator::Add => "Addition",
+                TackyBinaryOperator::Subtract => "Subtraction",
+                TackyBinaryOperator::Multiply => "Multiply",
+                TackyBinaryOperator::Divide => "Divide",
+                TackyBinaryOperator::Remainder => "Remainder",
+                TackyBinaryOperator::And => "Bitwise And",
+                TackyBinaryOperator::Or => "Bitwise Or",
+                TackyBinaryOperator::Xor => "Bitwise Xor",
+                TackyBinaryOperator::LeftShift => "Leftshift Operator",
+                TackyBinaryOperator::RightShift => "Rightshift operator",
+            }
         }
     }
 }

@@ -1,5 +1,8 @@
+/// Represents the different types of tokens that the lexer can produce.
+/// Each token corresponds to a syntactic element of the C language.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TokenType {
+    // Operators
     PLUS,
     ASTERISK,
     ForwardSlash,
@@ -12,17 +15,26 @@ pub enum TokenType {
     BITWISE,
     NEGATION,
     DECREMENT,
+
+    // Delimiters
     LPAREN,
     RPAREN,
     LBRACE,
     RBRACE,
     SEMICOLON,
+
+    // Literals and Identifiers
     NUMBER,
     IDENTIFIER,
+
+    // Keywords
     KEYWORD(Keyword),
+
+    // End of File
     EOF,
 }
 
+/// Represents the keywords of the C language.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Keyword {
     INT,
@@ -31,6 +43,7 @@ pub enum Keyword {
 }
 
 impl Keyword {
+    /// Converts a keyword enum to its string representation.
     #[allow(unused)]
     pub fn as_str(&self) -> &'static str {
         match self {
@@ -40,6 +53,7 @@ impl Keyword {
         }
     }
 
+    /// Converts a string to a keyword enum if it's a valid keyword.
     pub fn to_keyword(s: &str) -> Option<Self> {
         match s {
             "int" => Some(Self::INT),
@@ -49,16 +63,18 @@ impl Keyword {
         }
     }
 
+    /// Checks if a given string is a keyword.
     pub fn is_keyword(s: &str) -> bool {
-        match Keyword::to_keyword(s) {
-            Some(_) => true,
-            None => false,
-        }
+        Keyword::to_keyword(s).is_some()
     }
 }
 
+/// Represents a range in the source code, used for error reporting.
 pub type Span = std::ops::Range<usize>;
 
+/// Represents a token, which is a single unit of the source code.
+/// It contains the token type, its location in the source code (span),
+/// and the actual text of the token (lexeme).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Token {
     pub ttype: TokenType,
@@ -81,8 +97,11 @@ impl Token {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Lexer {
+    /// The input source code as a vector of characters.
     input: Vec<char>,
+    /// The current position of the lexer in the input.
     pos: usize,
+    /// The current character being processed.
     current_char: Option<char>,
 }
 
@@ -90,6 +109,7 @@ impl Lexer {
     pub fn new(program: String) -> Self {
         let input: Vec<char> = program.chars().collect();
         let current_char = input.first().copied();
+        println!("[Lexer] Initialized with program of length {}", input.len());
         Self {
             input: input,
             pos: 0,
@@ -97,11 +117,13 @@ impl Lexer {
         }
     }
 
+    /// Advances the lexer to the next character in the input.
     fn advance(&mut self) {
         self.pos += 1;
         self.current_char = self.input.get(self.pos).copied();
     }
 
+    /// Peeks at the next character in the input without consuming it.
     fn peek(&self) -> Option<char> {
         self.input.get(self.pos + 1).copied()
     }
@@ -116,6 +138,8 @@ impl Lexer {
         }
     }
 
+    /// Skips characters until a newline is encountered.
+    /// This is used for single-line comments.
     fn skip_until_newline(&mut self) -> Result<(), String> {
         while let Some(ch) = self.current_char {
             self.advance();
@@ -126,6 +150,7 @@ impl Lexer {
         Ok(())
     }
 
+    /// Skips a comment, which can be single-line (//) or multi-line (/* ... */).
     fn skip_comment(&mut self) -> Result<(), String> {
         let cc = self.current_char;
 
@@ -136,10 +161,13 @@ impl Lexer {
         let cc = cc.unwrap();
 
         if cc == '/' {
-            // skip characters until new line is found
+            // This is a single line comment
+            println!("[Lexer] Skipping single-line comment");
             self.advance(); // skip /
             self.skip_until_newline()?;
         } else if cc == '*' {
+            // This is a multi-line comment
+            println!("[Lexer] Skipping multi-line comment");
             self.advance();
 
             while let Some(ch) = self.current_char {
@@ -150,7 +178,6 @@ impl Lexer {
                     }
 
                     let cc = self.current_char.unwrap();
-                    println!("this comment line: {}, cc = {}", self.pos, cc);
                     if cc == '/' {
                         self.advance();
                         break;
@@ -161,8 +188,9 @@ impl Lexer {
         return Ok(());
     }
 
+    /// Parses a number literal.
     fn parse_number(&mut self) -> Result<Token, String> {
-        println!("parsing a number now");
+        println!("[Lexer] Parsing a number");
         let start_pos = self.pos;
         let mut numbers = String::new();
 
@@ -171,8 +199,7 @@ impl Lexer {
                 numbers.push(ch);
                 self.advance();
             } else {
-                // only if this is a breaking character, the number is valid
-                // if it a character for example, this number is probably invalid
+                // A number cannot be followed by an alphabetic character.
                 if ch.is_alphabetic() {
                     return Err(format!(
                         "A number cannot end with alphabets. Ends with {} at {}",
@@ -186,15 +213,14 @@ impl Lexer {
         if numbers.is_empty() {
             return Err("Not a valid number".to_string());
         }
-        return Ok(Token::new(
-            TokenType::NUMBER,
-            start_pos,
-            self.pos,
-            numbers.to_string(),
-        ));
+        let token = Token::new(TokenType::NUMBER, start_pos, self.pos, numbers.to_string());
+        println!("[Lexer] Parsed number: {:?}", token);
+        return Ok(token);
     }
 
+    /// Parses a keyword or an identifier.
     fn parse_keyword_or_ident(&mut self) -> Result<Token, String> {
+        println!("[Lexer] Parsing a keyword or identifier");
         let start_pos = self.pos;
         let mut word = String::new();
 
@@ -221,23 +247,29 @@ impl Lexer {
 
         if Keyword::is_keyword(&word) {
             let kw = Keyword::to_keyword(&word).unwrap();
-            return Ok(Token::new(
-                TokenType::KEYWORD(kw),
-                start_pos,
-                self.pos,
-                word,
-            ));
+            let token = Token::new(TokenType::KEYWORD(kw), start_pos, self.pos, word);
+            println!("[Lexer] Parsed keyword: {:?}", token);
+            return Ok(token);
         } else {
-            return Ok(Token::new(TokenType::IDENTIFIER, start_pos, self.pos, word));
+            let token = Token::new(TokenType::IDENTIFIER, start_pos, self.pos, word);
+            println!("[Lexer] Parsed identifier: {:?}", token);
+            return Ok(token);
         }
     }
 
+    /// Gets the next token from the input stream.
     fn get_next_token(&mut self) -> Result<Token, String> {
         loop {
             self.skip_whitespace();
 
             let i = self.pos;
-            println!("Lexing at position: {}", i);
+            if let Some(current_char) = self.current_char {
+                println!(
+                    "[Lexer] Lexing at position: {}, character: '{}'",
+                    i, current_char
+                );
+            }
+
             match self.current_char {
                 None => return Ok(Token::new(TokenType::EOF, i, i, String::new())),
                 Some('+') => {
@@ -304,7 +336,8 @@ impl Lexer {
                     return Ok(Token::new(TokenType::SEMICOLON, i, i + 1, ";".to_string()));
                 }
                 Some('#') => {
-                    // Process # as a comment for now
+                    // Preprocessor directives are treated as comments for now.
+                    println!("[Lexer] Skipping preprocessor directive.");
                     self.advance();
                     self.skip_until_newline()?;
                 }
@@ -375,7 +408,10 @@ impl Lexer {
         }
     }
 
+    /// Tokenizes the entire input program.
+    /// This method repeatedly calls `get_next_token` until it reaches the end of the file.
     pub fn tokenize(&mut self) -> Result<Vec<Token>, String> {
+        println!("[Lexer] Starting tokenization.");
         let mut tokens = Vec::new();
 
         loop {
@@ -383,10 +419,18 @@ impl Lexer {
             let is_eof = token.ttype == TokenType::EOF;
 
             if is_eof {
+                println!("[Lexer] Reached end of file.");
                 break;
             }
 
             tokens.push(token);
+        }
+        println!(
+            "[Lexer] Tokenization complete. Found {} tokens.",
+            tokens.len()
+        );
+        if std::env::var("CC_DEBUG").is_ok() {
+            dbg!(&tokens);
         }
 
         return Ok(tokens);

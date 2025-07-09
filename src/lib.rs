@@ -4,6 +4,7 @@ pub mod parser;
 mod asm_ir_pass;
 mod tacky_pass;
 
+
 use asm_ir_pass::assembly_ir_gen;
 use crate::codegen::Codegen;
 use crate::lexer::Lexer;
@@ -46,7 +47,7 @@ pub fn compile(source_code: String, stage: &CompilationStage) -> Result<String, 
     }
 
     let assembly_ast = assembly_ir_gen::generate_asm_ir(&tacky_ast);
-    println!("IR ast: \n {:#?}", &assembly_ast);
+    println!("IR ast: \n {}", &assembly_ast);
 
     if matches!(stage, CompilationStage::Codegen) {
         return Ok("asm gen finished".to_string());

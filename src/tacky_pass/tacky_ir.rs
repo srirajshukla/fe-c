@@ -1,29 +1,48 @@
+/// Tacky IR (Three-Address Code) is a simplified, linear representation of the program.
+/// It's an intermediate step between the AST and the final assembly code.
+/// Each instruction has at most three operands (two sources and one destination),
+/// which makes it easy to translate into assembly.
+
 use std::fmt;
 
+/// Represents the entire program in Tacky IR.
 #[derive(Debug)]
 pub struct TackyProgram {
     pub function_definition: TackyFunction,
 }
 
+/// Represents a single function in Tacky IR.
 #[derive(Debug)]
 pub struct TackyFunction {
+    /// The name of the function.
     pub identifier: String,
+    /// The body of the function, a list of Tacky instructions.
     pub body: Vec<TackyInstruction>,
 }
 
+/// Represents a single instruction in Tacky IR.
+/// Each instruction is a simple operation, like return, or a unary/binary operation.
 #[derive(Debug)]
 pub enum TackyInstruction {
+    /// A return instruction, with an optional return value.
     Return(Option<TackyVal>),
+    /// A unary operation (e.g., negation).
     Unary(TackyUnary),
+    /// A binary operation (e.g., addition).
     Binary(TackyBinary),
 }
 
+/// Represents a value in Tacky IR, which can be a constant or a temporary variable.
 #[derive(Debug, Clone)]
 pub enum TackyVal {
+    /// A constant integer value.
     Constant(i64),
+    /// A temporary variable, represented as a string (e.g., "tmp.0").
+    /// These are created by the Tacky IR generator to hold intermediate results.
     Variable(String),
 }
 
+/// Represents a unary operation in Tacky IR (e.g., `dest = op src`).
 #[derive(Debug, Clone)]
 pub struct TackyUnary {
     pub operator: TackyUnaryOperator,
@@ -31,12 +50,14 @@ pub struct TackyUnary {
     pub dest: TackyVal,
 }
 
+/// Represents the different types of unary operators in Tacky IR.
 #[derive(Debug, Clone)]
 pub enum TackyUnaryOperator {
     Complement,
     Negate,
 }
 
+/// Represents a binary operation in Tacky IR (e.g., `dest = src1 op src2`).
 #[derive(Debug, Clone)]
 pub struct TackyBinary {
     pub operator: TackyBinaryOperator,
@@ -45,6 +66,7 @@ pub struct TackyBinary {
     pub dest: TackyVal,
 }
 
+/// Represents the different types of binary operators in Tacky IR.
 #[derive(Debug, Clone)]
 pub enum TackyBinaryOperator {
     Add,
@@ -58,6 +80,8 @@ pub enum TackyBinaryOperator {
     LeftShift,
     RightShift,
 }
+
+// Display implementations for pretty-printing the Tacky IR.
 
 impl fmt::Display for TackyProgram {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -84,9 +108,13 @@ impl fmt::Display for TackyInstruction {
             },
             TackyInstruction::Unary(unary) => {
                 write!(f, "{} = {} {}", unary.dest, unary.operator, unary.src)
-            },
+            }
             TackyInstruction::Binary(binary) => {
-                write!(f, "{} = {} {} {}", binary.dest, binary.src1, binary.operator, binary.src2)
+                write!(
+                    f,
+                    "{} = {} {} {}",
+                    binary.dest, binary.src1, binary.operator, binary.src2
+                )
             }
         }
     }
@@ -95,12 +123,8 @@ impl fmt::Display for TackyInstruction {
 impl fmt::Display for TackyVal {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            TackyVal::Constant(c) => {
-                write!(f, "{}", c)
-            }
-            TackyVal::Variable(v) => {
-                write!(f, "{}", v)
-            }
+            TackyVal::Constant(c) => write!(f, "{}", c),
+            TackyVal::Variable(v) => write!(f, "{}", v),
         }
     }
 }
@@ -132,9 +156,10 @@ impl fmt::Display for TackyBinaryOperator {
 }
 
 impl TackyProgram {
+    /// Pretty prints the Tacky IR with comments explaining each instruction.
     pub fn pretty_print_with_comments(&self) -> String {
         let mut result = String::new();
-        result.push_str(&"# Three-Address Code (Tacky IR)\n".to_string());
+        result.push_str("# Three-Address Code (Tacky IR)\n");
         result.push_str(&format!(
             "# Function: {}\n\n",
             self.function_definition.identifier
@@ -153,6 +178,7 @@ impl TackyProgram {
     }
 }
 impl TackyInstruction {
+    /// Returns a human-readable description of the Tacky instruction.
     pub fn description(&self) -> &'static str {
         match self {
             TackyInstruction::Return(_) => "Return from function",
@@ -163,15 +189,15 @@ impl TackyInstruction {
             TackyInstruction::Binary(binary) => match binary.operator {
                 TackyBinaryOperator::Add => "Addition",
                 TackyBinaryOperator::Subtract => "Subtraction",
-                TackyBinaryOperator::Multiply => "Multiply",
-                TackyBinaryOperator::Divide => "Divide",
+                TackyBinaryOperator::Multiply => "Multiplication",
+                TackyBinaryOperator::Divide => "Division",
                 TackyBinaryOperator::Remainder => "Remainder",
-                TackyBinaryOperator::And => "Bitwise And",
-                TackyBinaryOperator::Or => "Bitwise Or",
-                TackyBinaryOperator::Xor => "Bitwise Xor",
-                TackyBinaryOperator::LeftShift => "Leftshift Operator",
-                TackyBinaryOperator::RightShift => "Rightshift operator",
-            }
+                TackyBinaryOperator::And => "Bitwise AND",
+                TackyBinaryOperator::Or => "Bitwise OR",
+                TackyBinaryOperator::Xor => "Bitwise XOR",
+                TackyBinaryOperator::LeftShift => "Left shift",
+                TackyBinaryOperator::RightShift => "Right shift",
+            },
         }
     }
 }

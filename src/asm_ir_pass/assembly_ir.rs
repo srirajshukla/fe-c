@@ -1,35 +1,52 @@
 use std::fmt::{Display, Formatter};
 
+/// Represents the entire program as an Assembly Abstract Syntax Tree (AST).
+/// This is a low-level representation of the program, close to the final assembly code.
 #[derive(Debug)]
 pub struct AssemblyAst {
     pub function_def: AsmFunction,
 }
 
+/// Represents a single function in the Assembly AST.
 #[derive(Debug)]
 pub struct AsmFunction {
+    /// The name of the function.
     pub name: String,
+    /// The list of assembly instructions in the function body.
     pub instructions: Vec<AsmInstruction>,
 }
 
+/// Represents a single assembly instruction.
 #[derive(Debug, Clone)]
 pub enum AsmInstruction {
+    /// Return from the function.
     Ret,
+    /// A unary operation (e.g., `negq rax`).
     AsmUnary(AsmUnaryOperator, AsmOperand),
+    /// A binary operation (e.g., `addq rax, rbx`).
     AsmBinary(AsmBinaryOperator, AsmOperand, AsmOperand),
+    /// Allocate space on the stack.
     AllocateStack(i64),
+    /// Move data between operands.
     Mov(AsmOperand, AsmOperand),
+    /// Push a register onto the stack.
     Push(AsmRegister),
+    /// Pop a value from the stack into a register.
     Pop(AsmRegister),
+    /// Signed division.
     Idiv(AsmOperand),
+    /// Convert doubleword to quadword.
     Cdq,
 }
 
+/// Represents a unary operator in assembly.
 #[derive(Debug, Clone)]
 pub enum AsmUnaryOperator {
-    Neg,
-    Not,
+    Neg, // Negation
+    Not, // Bitwise NOT
 }
 
+/// Represents a binary operator in assembly.
 #[derive(Debug, Clone, PartialEq)]
 pub enum AsmBinaryOperator {
     Add,
@@ -38,29 +55,44 @@ pub enum AsmBinaryOperator {
     Xor,
     And,
     Or,
-    Shr, // shift right
-    Shl, // shift left
+    Shr, // Shift right
+    Shl, // Shift left
 }
 
+/// Represents an operand in an assembly instruction.
 #[derive(Debug, Clone)]
 pub enum AsmOperand {
+    /// An immediate value (a constant).
     Imm(i64),
+    /// A hardware register.
     Reg(AsmRegister),
+    /// A pseudo-register, which will be replaced by a stack location.
+    /// This is an abstraction used before the final register allocation.
     Pseudo(String),
+    /// A location on the stack, represented as an offset from the base pointer.
     Stack(i64),
 }
 
+/// Represents a hardware register in the x86-64 architecture.
+/// The comments indicate the register's role in the System V ABI.
 #[derive(Debug, Clone)]
 pub enum AsmRegister {
+    // The following registers are used for integer arguments and return values.
     AX,
     ECX,
     DX,
-    R10,
-    R11,
-    CL,
-    RBP,
-    RSP,
+
+    // The following registers are temporary and can be used for intermediate calculations.
+    R10, // Temporary register
+    R11, // Temporary register
+
+    // The following registers have special purposes.
+    CL,  // Low byte of ECX, used for shifts
+    RBP, // Base pointer, for stack frames
+    RSP, // Stack pointer
 }
+
+// Display implementations for pretty-printing the Assembly IR.
 
 impl Display for AssemblyAst {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -88,7 +120,7 @@ impl Display for AsmInstruction {
             AsmInstruction::AllocateStack(size) => write!(f, "subq ${}, %rsp", size),
             AsmInstruction::Mov(src, dest) => write!(f, "movq {}, {}", src, dest),
             AsmInstruction::AsmUnary(op, operand) => write!(f, "{} {}", op, operand),
-            AsmInstruction::AsmBinary(op, op1, op2) => write!(f, "{} {} {}", op, op1, op2),
+            AsmInstruction::AsmBinary(op, op1, op2) => write!(f, "{} {}, {}", op, op1, op2),
             AsmInstruction::Idiv(src) => write!(f, "idivq {}", src),
             AsmInstruction::Cdq => write!(f, "cqo"),
         }
@@ -97,7 +129,7 @@ impl Display for AsmInstruction {
 
 impl Display for AsmUnaryOperator {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let v = match self { 
+        let v = match self {
             AsmUnaryOperator::Neg => "negq",
             AsmUnaryOperator::Not => "notq",
         };
@@ -123,25 +155,17 @@ impl Display for AsmBinaryOperator {
 impl Display for AsmOperand {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            AsmOperand::Imm(v) => {
-                write!(f, "${}", v)
-            }
-            AsmOperand::Reg(reg) => {
-                write!(f, "{}", reg)
-            }
-            AsmOperand::Pseudo(id) => {
-                write!(f, "{}", id)
-            }
-            AsmOperand::Stack(offset) => {
-                write!(f, "{}(%rbp)", offset)
-            }
+            AsmOperand::Imm(v) => write!(f, "${}", v),
+            AsmOperand::Reg(reg) => write!(f, "{}", reg),
+            AsmOperand::Pseudo(id) => write!(f, "% {}(%rip)", id), // RIP-relative addressing for pseudos
+            AsmOperand::Stack(offset) => write!(f, "{}(%rbp)", offset),
         }
     }
 }
 
 impl Display for AsmRegister {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self { 
+        match self {
             AsmRegister::AX => write!(f, "%rax"),
             AsmRegister::DX => write!(f, "%rdx"),
             AsmRegister::ECX => write!(f, "%rcx"),
@@ -150,6 +174,6 @@ impl Display for AsmRegister {
             AsmRegister::CL => write!(f, "%cl"),
             AsmRegister::RBP => write!(f, "%rbp"),
             AsmRegister::RSP => write!(f, "%rsp"),
-        } 
+        }
     }
 }
